@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>달동이 · 자금 흐름 레이더</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css"/>
+<style>
+  :root{
+    --bg:#04050c; --panel:#0c1220; --line:rgba(255,255,255,.08);
+    --text:#e9edf6; --dim:#8b93a9; --faint:#565f75;
+    --on:#2fe6a8; --off:#ff5d6c; --gold:#f2d27a;
+    --font:"Pretendard Variable",Pretendard,-apple-system,system-ui,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"Roboto Mono",monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:
+      radial-gradient(1300px 800px at 50% -12%, #13214a 0%, transparent 52%),
+      radial-gradient(1000px 700px at 100% 108%, #1a1235 0%, transparent 48%),
+      radial-gradient(900px 600px at 0% 100%, #0a1e2a 0%, transparent 45%),
+      var(--bg);
+    color:var(--text); font-family:var(--font);
+    -webkit-font-smoothing:antialiased; overflow:hidden;
+  }
+  .wrap{position:fixed;inset:0;display:flex;flex-direction:column}
+  header{display:flex;align-items:center;gap:12px;padding:12px 18px;flex-wrap:wrap;
+    border-bottom:1px solid var(--line);backdrop-filter:blur(6px);z-index:6}
+  .brand{display:flex;align-items:center;gap:10px;margin-right:auto}
+  .moon{width:26px;height:26px;filter:drop-shadow(0 0 8px rgba(242,210,122,.6))}
+  .brand .t{font-weight:800;font-size:15.5px;letter-spacing:-.01em}
+  .brand .s{font-size:10.5px;color:var(--faint);letter-spacing:.16em;font-weight:700;text-transform:uppercase}
+  .live{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;color:var(--on)}
+  .live .d{width:7px;height:7px;border-radius:50%;background:var(--on);box-shadow:0 0 10px var(--on);animation:blink 1.6s infinite}
+  @keyframes blink{50%{opacity:.35}}
+  .seg{display:flex;flex-wrap:wrap;gap:3px;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:3px}
+  .seg button{appearance:none;border:0;background:transparent;color:var(--dim);font-family:inherit;
+    font-weight:700;font-size:11.5px;padding:6px 10px;border-radius:8px;cursor:pointer;transition:.15s;white-space:nowrap}
+  .seg button:hover{color:var(--text)}
+  .seg button[aria-pressed="true"]{background:linear-gradient(180deg,#1d2a47,#141d31);color:var(--text);box-shadow:0 0 0 1px rgba(255,255,255,.06) inset}
+  .socials{display:flex;gap:7px;flex-wrap:wrap}
+  .sbtn{display:inline-flex;align-items:center;gap:6px;text-decoration:none;
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:7px 11px;font-size:11.5px;font-weight:800;color:var(--dim);transition:.15s;white-space:nowrap}
+  .sbtn svg{width:15px;height:15px;flex:0 0 auto}
+  .sbtn:hover{color:var(--text);border-color:rgba(255,255,255,.22);transform:translateY(-1px)}
+  .sbtn.yt:hover{border-color:rgba(255,0,0,.5)}
+  .sbtn.ig:hover{border-color:rgba(225,48,108,.55)}
+  .sbtn.tg:hover{border-color:rgba(42,171,238,.55)}
+  .sbtn.th:hover{border-color:rgba(255,255,255,.45)}
+  @media(max-width:900px){.sbtn span{display:none}.sbtn{padding:7px 9px}}
+  .stage{position:relative;flex:1;min-height:0}
+  canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:pointer}
+  .axis{position:absolute;top:14px;z-index:4;border:1px solid var(--line);background:rgba(9,13,26,.7);
+    border-radius:11px;padding:8px 12px;cursor:pointer;transition:.15s;backdrop-filter:blur(6px)}
+  .axis:hover{border-color:rgba(255,255,255,.22);transform:translateY(-1px)}
+  .axis.l{left:18px}.axis.r{right:18px;text-align:right}
+  .axis .k{font-size:10px;font-weight:800;letter-spacing:.14em;color:var(--faint)}
+  .axis b{display:block;font-size:12.5px;margin-top:3px}
+  .axis.l b{color:var(--gold)} .axis.r b{color:var(--on)}
+  .axis .q{display:inline-block;margin-left:5px;font-size:10px;color:var(--faint)}
+  .verdict{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);
+    display:flex;align-items:center;gap:10px;max-width:80%;
+    background:rgba(9,13,26,.85);border:1px solid var(--line);border-radius:13px;
+    padding:11px 18px;backdrop-filter:blur(8px);z-index:3;text-align:center}
+  .verdict .vt{font-weight:800;font-size:14px}
+  .verdict .vd{font-size:12.5px;color:var(--dim)}
+  @media(max-width:640px){.verdict{flex-direction:column;gap:3px;padding:10px 14px;max-width:92%}}
+  .rankwrap{position:absolute;top:78px;right:16px;width:190px;display:flex;flex-direction:column;gap:6px;z-index:3;pointer-events:none}
+  .rankttl{font-size:10px;font-weight:800;letter-spacing:.12em;color:var(--faint);text-transform:uppercase}
+  .rk{display:grid;grid-template-columns:14px 1fr auto;align-items:center;gap:8px;
+    background:rgba(11,17,30,.72);border:1px solid var(--line);border-radius:10px;padding:6px 10px}
+  .rk .dot{width:8px;height:8px;border-radius:50%}
+  .rk .nm{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rk .pc{font-size:12px;font-weight:800;font-variant-numeric:tabular-nums;font-family:var(--mono)}
+  @media(max-width:1000px){.rankwrap{display:none}}
+  .hint{position:absolute;left:18px;bottom:18px;font-size:11px;color:var(--faint);z-index:3;max-width:190px;line-height:1.55}
+  @media(max-width:1100px){.hint{display:none}}
+  .panel{position:absolute;top:14px;left:14px;bottom:14px;width:340px;max-width:calc(100% - 28px);
+    background:linear-gradient(180deg,rgba(13,19,33,.985),rgba(9,13,24,.985));
+    border:1px solid var(--line);border-radius:16px;padding:22px;z-index:8;
+    transform:translateX(-115%);opacity:0;transition:transform .32s cubic-bezier(.2,.7,.2,1),opacity .25s;
+    overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+  .panel.open{transform:none;opacity:1}
+  .panel .px{position:absolute;top:16px;right:16px;width:30px;height:30px;border-radius:9px;border:1px solid var(--line);
+    background:rgba(255,255,255,.03);color:var(--dim);font-size:14px;cursor:pointer}
+  .panel .px:hover{color:var(--text);border-color:rgba(255,255,255,.2)}
+  .ptag{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;padding:4px 10px;border-radius:20px;margin-bottom:12px}
+  .panel h3{margin:0 0 4px;font-size:22px;font-weight:800;letter-spacing:-.02em}
+  .pnow{font-size:13px;font-weight:800;font-family:var(--mono);margin-bottom:18px}
+  .psec{margin-bottom:16px}
+  .pk{font-size:10.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);margin-bottom:6px}
+  .psec p{margin:0;font-size:13.5px;line-height:1.62;color:#cdd4e2}
+  .mlist{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+  .mrow{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;
+    background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:9px;padding:7px 10px;cursor:pointer}
+  .mrow:hover{border-color:rgba(255,255,255,.2)}
+  .mrow .mn{font-size:12.5px;font-weight:700}
+  .mrow .mv{font-size:12.5px;font-weight:800;font-family:var(--mono)}
+  @media(max-width:640px){.panel{top:auto;left:0;right:0;bottom:0;width:100%;max-width:100%;border-radius:18px 18px 0 0;
+    transform:translateY(110%);max-height:76%}.panel.open{transform:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <svg class="moon" viewBox="0 0 24 24" fill="none"><path d="M20 14.5A8.5 8.5 0 1 1 10.2 4a6.6 6.6 0 0 0 9.8 10.5Z" fill="#f2d27a"/></svg>
+      <div><div class="t">자금 흐름 레이더</div><div class="s">Liquidity Flow · 달동이</div></div>
+    </div>
+    <span class="live"><span class="d"></span><span id="liveTxt">샘플</span></span>
+    <div class="socials">
+      <a class="sbtn yt" href="https://linktw.in/dteogV" target="_blank" rel="noopener" title="YouTube">
+        <svg viewBox="0 0 24 24" fill="#ff0000"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8ZM9.6 15.6V8.4l6.2 3.6-6.2 3.6Z"/></svg><span>YouTube</span></a>
+      <a class="sbtn ig" href="https://www.instagram.com/daldong_222/" target="_blank" rel="noopener" title="Instagram">
+        <svg viewBox="0 0 24 24" fill="none"><defs><linearGradient id="iggr" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#feda75"/><stop offset=".4" stop-color="#fa7e1e"/><stop offset=".7" stop-color="#d62976"/><stop offset="1" stop-color="#962fbf"/></linearGradient></defs><rect x="2" y="2" width="20" height="20" rx="6" fill="url(#iggr)"/><circle cx="12" cy="12" r="4.3" fill="none" stroke="#fff" stroke-width="1.8"/><circle cx="17.4" cy="6.6" r="1.2" fill="#fff"/></svg><span>Instagram</span></a>
+      <a class="sbtn tg" href="https://t.me/daldong_22" target="_blank" rel="noopener" title="Telegram">
+        <svg viewBox="0 0 24 24" fill="#2aabee"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42Z"/></svg><span>Telegram</span></a>
+      <a class="sbtn th" href="https://www.threads.com/@daldong_222" target="_blank" rel="noopener" title="Threads">
+        <svg viewBox="0 0 24 24" fill="#ffffff"><path d="M16.4 11.3c-.1 0-.2-.1-.3-.1-.2-3.2-1.9-5-4.8-5-1.7 0-3.2.7-4.1 2.1l1.6 1.1c.6-1 1.6-1.2 2.5-1.2 1 0 1.8.3 2.3.9.3.4.6 1 .7 1.7-.9-.2-1.8-.2-2.8-.2-2.8.2-4.6 1.8-4.5 4.1.1 1.1.6 2.1 1.5 2.8.8.5 1.8.8 2.9.7 1.4-.1 2.5-.6 3.3-1.6.6-.8 1-1.8 1.1-3 .7.4 1.2 1 1.5 1.7.5 1.1.5 3-1 4.5-1.3 1.3-2.9 1.9-5.3 1.9-2.7 0-4.7-.9-6-2.5C3.9 17.4 3.3 15.2 3.3 12s.6-5.4 1.8-6.9c1.3-1.6 3.3-2.4 6-2.5 2.7 0 4.8.9 6.1 2.5.6.8 1.1 1.8 1.4 3l1.9-.5c-.4-1.5-1-2.8-1.8-3.8C17 1.7 14.4.6 11.1.6h-.02C7.8.6 5.2 1.7 3.5 3.8 1.9 5.7 1.1 8.4 1.1 12s.8 6.3 2.4 8.2C5.2 22.3 7.8 23.4 11.1 23.4h.02c2.9 0 5-.8 6.7-2.5 2.2-2.2 2.1-5 1.4-6.7-.5-1.2-1.5-2.2-2.8-2.9Zm-4.9 5.3c-1.2.1-2.5-.5-2.6-1.7-.1-.9.6-1.9 2.7-2h.5c.8 0 1.5.1 2.2.2-.2 2.7-1.5 3.4-2.8 3.5Z"/></svg><span>Threads</span></a>
+    </div>
+    <div class="seg" id="seg"></div>
+  </header>
+  <div class="stage">
+    <div class="axis l" id="axSafe"><div class="k">← 위험회피</div><b>안전자산 <span class="q">ⓘ</span></b></div>
+    <div class="axis r" id="axRisk"><div class="k">위험선호 →</div><b>위험자산 <span class="q">ⓘ</span></b></div>
+    <canvas id="c"></canvas>
+    <div class="rankwrap" id="rank"><div class="rankttl">자금 유입 순위</div></div>
+    <div class="hint">💡 자산을 <b style="color:#e9edf6">클릭</b>하면 설명이 나와요. 위/좌우의 <b style="color:#e9edf6">안전자산·위험자산</b>을 누르면 그룹 설명도 볼 수 있어요.</div>
+    <div class="verdict"><span class="vt" id="vt">—</span><span class="vd" id="vd">—</span></div>
+    <div class="panel" id="panel" aria-hidden="true">
+      <button class="px" id="px" aria-label="닫기">✕</button>
+      <div class="ptag" id="ptag"></div>
+      <h3 id="pname"></h3>
+      <div class="pnow" id="pnow"></div>
+      <div class="psec"><div class="pk" id="pk1">왜 중요한가</div><p id="pwhy"></p></div>
+      <div class="psec"><div class="pk" id="pk2">어떻게 보나</div><p id="pread"></p></div>
+      <div class="psec" id="pmembers" style="display:none">
+        <div class="pk">포함 자산</div>
+        <div class="mlist" id="mlist"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const TFS=[["1m","1분"],["15m","15분"],["30m","30분"],["1h","1시간"],["4h","4시간"],["6h","6시간"],["12h","12시간"],["1d","1일"],["1w","1주"],["1M","1달"]];
+const ASSETS=[
+  {id:"ndx",   name:"나스닥",   group:"risk"},
+  {id:"spx",   name:"S&P 500", group:"risk"},
+  {id:"btc",   name:"비트코인", group:"risk"},
+  {id:"wti",   name:"WTI 원유", group:"risk"},
+  {id:"copper",name:"구리",     group:"risk"},
+  {id:"gold",  name:"금",       group:"safe"},
+  {id:"bond",  name:"미국채",   group:"safe"},
+];
+const DATA={
+  "1m": {ndx:-0.05,spx:-0.03,btc:0.12,wti:-0.02,copper:0.01, gold:0.02,bond:0.01},
+  "15m":{ndx:-0.20,spx:-0.12,btc:0.35,wti:-0.15,copper:-0.08, gold:0.10,bond:0.05},
+  "30m":{ndx:-0.35,spx:-0.22,btc:0.50,wti:-0.25,copper:-0.14, gold:0.16,bond:0.08},
+  "1h": {ndx:-0.60,spx:-0.35,btc:0.20,wti:-0.40,copper:-0.30, gold:0.25,bond:0.12},
+  "4h": {ndx:-1.10,spx:-0.60,btc:-0.50,wti:-0.65,copper:-0.80, gold:0.35,bond:0.22},
+  "6h": {ndx:-1.30,spx:-0.72,btc:-0.80,wti:-0.70,copper:-1.00, gold:0.30,bond:0.28},
+  "12h":{ndx:-1.45,spx:-0.78,btc:-1.00,wti:-0.75,copper:-1.10, gold:0.28,bond:0.34},
+  "1d": {ndx:-1.50,spx:-0.80,btc:-1.10,wti:-0.80,copper:-1.20, gold:0.30,bond:0.40},
+  "1w": {ndx:-3.20,spx:-2.10,btc:-6.00,wti:-2.50,copper:-3.00, gold:-1.50,bond:1.10},
+  "1M": {ndx:2.40,spx:1.80,btc:4.50,wti:1.20,copper:2.80, gold:-3.00,bond:-0.50},
+};
+const DETAIL={
+  ndx:{w:"기술·성장주의 심장. 돈이 풀리는지 조이는지(유동성)를 가장 크게 반영하는 지수예요.",r:"오르면 위험선호. S&P보다 더 빠지면 성장주에서 먼저 돈이 빠지는 신호로 봐요."},
+  spx:{w:"미국 대형주 500개를 묶은 지수. 글로벌 증시의 기준점이에요.",r:"전 세계 위험자산의 방향타. 여기가 꺾이면 대부분의 위험자산이 같이 꺾여요."},
+  btc:{w:"유동성의 최전선. 돈이 풀리는지 조이는지를 가장 빠르게 반영하는 위험자산이에요.",r:"나스닥과 같이 움직이면 유동성 장세, 따로 놀면 크립토 자체 이슈로 봐요."},
+  wti:{w:"실물 경기와 지정학의 척도. 인플레이션 압력을 가장 먼저 보여줘요.",r:"경기 확장이면 오르고 수요 둔화·침체 우려면 빠져요. 중동 리스크도 즉시 반영돼요."},
+  copper:{w:"'닥터 코퍼'라 불리는 경기 선행 지표. 전선·건설·전기차에 다 들어가 실물 수요를 반영해요.",r:"구리가 오르면 실물 경기 회복, 빠지면 둔화 우려. 금과 비교하면 방향이 더 뚜렷해요."},
+  gold:{w:"위기·인플레·달러 약세의 피난처. 안전자산의 대표예요.",r:"실질금리·달러와 반대로 움직여요. 구리보다 금이 강하면 경기 우려가 커지는 국면이에요."},
+  bond:{w:"세계에서 가장 안전한 자산으로 통하는 미국 국채. 위험회피의 목적지예요.",r:"돈이 몰리면 금리 하락(채권값↑)=안전선호. 금리가 오르면 위험선호나 인플레 우려로 봐요."},
+};
+const GROUP_INFO={
+  safe:{name:"안전자산",color:"242,210,122",
+    w:"시장이 불안할 때 돈이 도망가는 곳이에요. 크게 못 벌어도 잃지 않는 걸 우선하는 자금이 여기로 모여요. 금과 미국채가 대표적이고, 위기·경기침체 우려가 커질수록 강해져요.",
+    r:"안전자산만 초록이면 시장이 겁먹은 상태예요. 주식이 빠지는데 금·채권이 같이 오르면 전형적인 위험회피 국면. 반대로 안전자산이 빠지고 위험자산이 오르면 돈이 다시 공격적으로 도는 중이에요."},
+  risk:{name:"위험자산",color:"47,230,168",
+    w:"경기가 좋고 돈이 풀릴 때 수익을 노리는 자금이 몰리는 곳이에요. 주가지수·비트코인처럼 변동성이 크지만 상승 여력도 큰 자산들이에요. 원유·구리는 실물 경기 수요를 함께 반영해요.",
+    r:"위험자산이 일제히 초록이면 위험선호 국면. 특히 비트코인·나스닥이 앞장서면 유동성 장세로 봐요. 반대로 안전자산만 오르고 여기가 빠지면 돈이 몸을 사리는 중이에요."},
+};
+const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v)), rpos=v=>Math.max(0.5,v);
+/* ── 실시간 연동 ── */
+const SYM={ndx:"^IXIC",spx:"^GSPC",btc:"BTC-USD",wti:"CL=F",copper:"HG=F",gold:"GC=F",bond:"^TNX"};
+const CACHE={};           // tf -> {t:ts, v:{id:pct}}
+let IS_LIVE=false;
+function setLive(on){IS_LIVE=on;const el=document.getElementById("liveTxt");if(el)el.textContent=on?"LIVE":"샘플";}
+async function loadFlow(tf){
+  const c=CACHE[tf], fresh=["1m","15m","30m","1h"].includes(tf)?60e3:300e3;
+  if(c&&Date.now()-c.t<fresh){DATA[tf]=c.v;return;}
+  try{
+    const r=await fetch(`/api/flow?tf=${encodeURIComponent(tf)}`);
+    const d=await r.json();
+    const v={};let ok=false;
+    for(const id in SYM){const row=d[SYM[id]];
+      if(row&&typeof row.pct==="number"&&!row.error){
+        // 미국채는 '금리' 데이터라 방향을 뒤집음 (금리↑ = 채권값↓ = 자금 유출)
+        v[id]= id==="bond" ? -row.pct*0.5 : row.pct; ok=true;}
+      else v[id]=(DATA[tf]&&DATA[tf][id])||0;}
+    if(ok){DATA[tf]=v;CACHE[tf]={t:Date.now(),v};setLive(true);}
+  }catch(e){/* 실패 시 기존 값 유지 */}
+}
+
+const cv=document.getElementById("c"),ctx=cv.getContext("2d");
+let W=0,H=0;const DPR=Math.min(devicePixelRatio||1,2);
+const reduce=matchMedia("(prefers-reduced-motion:reduce)").matches;
+const RISK_ANG=[70,35,0,-35,-70],SAFE_ANG=[145,215];
+(function(){let ri=0,si=0;for(const a of ASSETS){a.ang=(a.group==="risk"?RISK_ANG[ri++]:SAFE_ANG[si++])*Math.PI/180;a.bend=(Math.random()-.5)*.24;}})();
+/* 기간 버튼 생성 */
+(function(){const seg=document.getElementById("seg");TFS.forEach(([k,label],i)=>{const b=document.createElement("button");b.dataset.k=k;b.textContent=label;b.setAttribute("aria-pressed",k==="1d");seg.appendChild(b);});})();
+const stars=[];
+function makeStars(){stars.length=0;const n=Math.round(W*H/6500);for(let i=0;i<n;i++)stars.push({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.3+.2,tw:Math.random()*6.28,sp:.6+Math.random()});}
+function resize(){const r=cv.getBoundingClientRect();W=Math.max(r.width,1);H=Math.max(r.height,1);cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);makeStars();}
+addEventListener("resize",resize);
+let period="1d",selected=null,selGroup=null;const parts=[];const cur={};ASSETS.forEach(a=>cur[a.id]=0);
+/* 기간이 짧으면 값이 작아서 시각적으로 안 보이므로 표시 배율만 조정(숫자는 실제값 표기) */
+const VIS={"1m":14,"15m":8,"30m":6,"1h":4,"4h":2.4,"6h":2.2,"12h":2,"1d":1.6,"1w":1,"1M":1};
+function geom(){const m=Math.max(Math.min(W,H),160);return{cx:W*.5,cy:H*.53,R:m*.35,hub:m*.088};}
+function nodePos(a){const g=geom();return{x:g.cx+Math.cos(a.ang)*g.R,y:g.cy-Math.sin(a.ang)*g.R};}
+function ctrl(g,p,bend){const mx=(g.cx+p.x)/2,my=(g.cy+p.y)/2,dx=p.x-g.cx,dy=p.y-g.cy;return{x:mx-dy*bend,y:my+dx*bend};}
+function qpt(a,b,c,t){const u=1-t;return{x:u*u*a.x+2*u*t*b.x+t*t*c.x,y:u*u*a.y+2*u*t*b.y+t*t*c.y};}
+function mag(id){return Math.min(Math.abs(cur[id])*(VIS[period]||1),9);}
+function spawn(){const g=geom();for(const a of ASSETS){const m=mag(a.id);if(m<.15)continue;if(Math.random()<m/16){const inflow=cur[a.id]>0,p=nodePos(a);parts.push({inflow,t:0,sp:.006+Math.random()*.005+m*.0006,A:{x:g.cx,y:g.cy},B:ctrl(g,p,a.bend),C:p,col:inflow?"47,230,168":"255,93,108",sz:1.2+Math.random()*1.6});}}if(parts.length>1200)parts.splice(0,parts.length-1200);}
+function scoreOf(){const risk=ASSETS.filter(a=>a.group==="risk"),safe=ASSETS.filter(a=>a.group==="safe");
+  const ra=risk.reduce((s,a)=>s+cur[a.id],0)/risk.length,sa=safe.reduce((s,a)=>s+cur[a.id],0)/safe.length;
+  return (ra-sa)*(VIS[period]||1);}
+function fmt(v){const d=Math.abs(v)<1?2:1;return (v>0?"+":"")+v.toFixed(d)+"%";}
+function verdict(){const s=scoreOf(),inflow=[...ASSETS].sort((a,b)=>cur[b.id]-cur[a.id]),top=inflow[0],bot=inflow[inflow.length-1];let vt,vd,col;
+  if(s>1.2){vt="위험선호 (Risk-On) 강함";col="var(--on)";vd=`돈이 위험자산으로 강하게 이동 — ${top.name} 유입 최고`;}
+  else if(s>.3){vt="위험선호 우위";col="var(--on)";vd=`${top.name} 등 위험자산으로 자금 유입, ${bot.name} 약세`;}
+  else if(s>-.3){vt="중립 · 관망";col="var(--gold)";vd="뚜렷한 쏠림 없음 — 방향 탐색 구간";}
+  else if(s>-1.2){vt="위험회피 우위";col="var(--off)";vd=`안전자산(${ASSETS.filter(a=>a.group==='safe').sort((a,b)=>cur[b.id]-cur[a.id])[0].name})으로 자금 이동, ${bot.name} 약세`;}
+  else{vt="위험회피 (Risk-Off) 강함";col="var(--off)";vd=`돈이 안전자산으로 도피 — ${bot.name} 이탈 심화`;}
+  const e=document.getElementById("vt");e.textContent=vt;e.style.color=col;document.getElementById("vd").textContent=vd;}
+function buildRank(){const wrap=document.getElementById("rank");wrap.querySelectorAll(".rk").forEach(e=>e.remove());
+  [...ASSETS].sort((a,b)=>cur[b.id]-cur[a.id]).forEach(a=>{const f=cur[a.id],pos=f>=0,el=document.createElement("div");el.className="rk";
+    el.innerHTML=`<span class="dot" style="background:${pos?'var(--on)':'var(--off)'}"></span><span class="nm">${a.name}</span><span class="pc" style="color:${pos?'var(--on)':'var(--off)'}">${fmt(f)}</span>`;
+    wrap.appendChild(el);});}
+let raf,tPrev=0,T=0;
+function frame(t){const dt=Math.min((t-tPrev)||16,40);tPrev=t;T+=dt/1000;const tgt=DATA[period];for(const a of ASSETS)cur[a.id]+=(tgt[a.id]-cur[a.id])*.07;
+  ctx.clearRect(0,0,W,H);
+  for(const s of stars){s.tw+=.02*s.sp;const a=.2+Math.abs(Math.sin(s.tw))*.55;ctx.fillStyle=`rgba(200,215,255,${a*.55})`;ctx.beginPath();ctx.arc(s.x,s.y,rpos(s.r),0,7);ctx.fill();}
+  const g=geom(),sc=scoreOf(),gcol=sc>.3?"47,230,168":sc<-.3?"255,93,108":"242,210,122";
+  for(let i=1;i<=4;i++){ctx.strokeStyle=`rgba(255,255,255,${.05-i*.006})`;ctx.lineWidth=1;ctx.beginPath();ctx.arc(g.cx,g.cy,rpos(g.R*i/4),0,7);ctx.stroke();}
+  ctx.globalCompositeOperation="lighter";
+  const bgr=ctx.createLinearGradient(g.cx-g.R,0,g.cx+g.R,0);
+  bgr.addColorStop(0,`rgba(242,210,122,${selGroup==="safe"?.14:.05})`);bgr.addColorStop(.5,"rgba(0,0,0,0)");bgr.addColorStop(1,`rgba(47,230,168,${selGroup==="risk"?.14:.05})`);
+  ctx.fillStyle=bgr;ctx.beginPath();ctx.arc(g.cx,g.cy,rpos(g.R),0,7);ctx.fill();
+  ctx.globalCompositeOperation="source-over";
+  if(!reduce){const sweep=(T*.6)%(Math.PI*2);ctx.save();ctx.translate(g.cx,g.cy);ctx.rotate(sweep);const grad=ctx.createLinearGradient(0,0,g.R,0);grad.addColorStop(0,`rgba(${gcol},.15)`);grad.addColorStop(1,`rgba(${gcol},0)`);ctx.fillStyle=grad;ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,rpos(g.R),-.27,.02);ctx.closePath();ctx.fill();ctx.restore();}
+  for(const a of ASSETS){const p=nodePos(a),f=cur[a.id],col=f>=0?"47,230,168":"255,93,108",al=.05+Math.min(mag(a.id)/9,1)*.14,c=ctrl(g,p,a.bend);
+    const hi=selected===a.id||selGroup===a.group;
+    ctx.strokeStyle=`rgba(${col},${hi?al+.2:al})`;ctx.lineWidth=hi?2:1.2;ctx.beginPath();ctx.moveTo(g.cx,g.cy);ctx.quadraticCurveTo(c.x,c.y,p.x,p.y);ctx.stroke();}
+  if(!reduce)spawn();
+  ctx.globalCompositeOperation="lighter";
+  for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.t+=p.sp*(dt/16);if(p.t>=1){parts.splice(i,1);continue;}const k=p.inflow?p.t:1-p.t,pt=qpt(p.A,p.B,p.C,k),fade=Math.sin(p.t*Math.PI);
+    ctx.fillStyle=`rgba(${p.col},${fade*.95})`;ctx.beginPath();ctx.arc(pt.x,pt.y,rpos(p.sz),0,7);ctx.fill();
+    ctx.fillStyle=`rgba(${p.col},${fade*.2})`;ctx.beginPath();ctx.arc(pt.x,pt.y,rpos(p.sz*3),0,7);ctx.fill();}
+  ctx.globalCompositeOperation="source-over";
+  ctx.textBaseline="middle";
+  for(const a of ASSETS){const p=nodePos(a),f=cur[a.id],pos=f>=0,col=pos?"47,230,168":"255,93,108",m=mag(a.id),rad=8+m*2.2,
+    pulse=1+Math.sin(T*2.2+a.ang*2)*.11*(m/9),sel=selected===a.id,ghi=selGroup===a.group;
+    const rg=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,rpos(rad*3.3));rg.addColorStop(0,`rgba(${col},${.3+m*.05})`);rg.addColorStop(1,`rgba(${col},0)`);
+    ctx.fillStyle=rg;ctx.beginPath();ctx.arc(p.x,p.y,rpos(rad*3.3*pulse),0,7);ctx.fill();
+    if(!reduce&&m>1){const pr=((T*.5+a.ang)%1);ctx.strokeStyle=`rgba(${col},${(1-pr)*.4})`;ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(p.x,p.y,rpos(rad+pr*22),0,7);ctx.stroke();}
+    if(sel||ghi){const gc=a.group==="safe"?"242,210,122":"47,230,168";ctx.strokeStyle=sel?`rgb(${col})`:`rgba(${gc},.85)`;ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y,rpos(rad+7),0,7);ctx.stroke();}
+    ctx.fillStyle=`rgb(${col})`;ctx.beginPath();ctx.arc(p.x,p.y,rpos(rad),0,7);ctx.fill();
+    ctx.fillStyle="rgba(5,6,12,.92)";ctx.beginPath();ctx.arc(p.x,p.y,rpos(rad*.4),0,7);ctx.fill();
+    const cs=Math.cos(a.ang),side=cs>.2?1:cs<-.2?-1:0,lx=p.x+side*(rad+9),ly=p.y;ctx.textAlign=side>0?"left":side<0?"right":"center";
+    ctx.shadowColor="rgba(0,0,0,.92)";ctx.shadowBlur=6;
+    ctx.fillStyle="#eef2fa";ctx.font='700 13.5px "Pretendard Variable",Pretendard,sans-serif';ctx.fillText(a.name,lx,ly-8);
+    ctx.fillStyle=`rgb(${col})`;ctx.font='800 13px ui-monospace,monospace';ctx.fillText(fmt(f),lx,ly+8);
+    ctx.shadowBlur=0;}
+  const gg=ctx.createRadialGradient(g.cx,g.cy,0,g.cx,g.cy,rpos(g.hub*1.9));gg.addColorStop(0,`rgba(${gcol},.4)`);gg.addColorStop(1,`rgba(${gcol},0)`);
+  ctx.fillStyle=gg;ctx.beginPath();ctx.arc(g.cx,g.cy,rpos(g.hub*1.9),0,7);ctx.fill();
+  if(!reduce){ctx.save();ctx.translate(g.cx,g.cy);ctx.rotate(T*.4);ctx.strokeStyle=`rgba(${gcol},.5)`;ctx.lineWidth=2;ctx.setLineDash([g.hub*.5,g.hub*.35]);ctx.beginPath();ctx.arc(0,0,rpos(g.hub*1.12),0,7);ctx.stroke();ctx.setLineDash([]);ctx.restore();}
+  ctx.fillStyle="rgba(8,12,24,.96)";ctx.strokeStyle=`rgba(${gcol},.55)`;ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(g.cx,g.cy,rpos(g.hub),0,7);ctx.fill();ctx.stroke();
+  const norm=clamp(sc/3,-1,1);ctx.lineWidth=4.5;ctx.lineCap="round";
+  ctx.strokeStyle="rgba(255,255,255,.09)";ctx.beginPath();ctx.arc(g.cx,g.cy,rpos(g.hub*.78),Math.PI*1.2,Math.PI*1.8);ctx.stroke();
+  ctx.strokeStyle=`rgb(${gcol})`;ctx.shadowColor=`rgb(${gcol})`;ctx.shadowBlur=12;const mid=Math.PI*1.5,end=mid+norm*Math.PI*.3;
+  ctx.beginPath();ctx.arc(g.cx,g.cy,rpos(g.hub*.78),Math.min(mid,end),Math.max(mid,end));ctx.stroke();ctx.shadowBlur=0;
+  ctx.textAlign="center";
+  ctx.fillStyle="#8b93a9";ctx.font='800 10.5px "Pretendard Variable",Pretendard,sans-serif';ctx.fillText("유동성",g.cx,g.cy-g.hub*.42);
+  ctx.fillStyle=`rgb(${gcol})`;ctx.font="800 "+Math.round(g.hub*.52)+'px "Pretendard Variable",Pretendard,sans-serif';ctx.fillText((sc>0?"+":"")+sc.toFixed(1),g.cx,g.cy+2);
+  const kl=sc>.3?"위험선호":sc<-.3?"위험회피":"중립";
+  ctx.fillStyle=`rgb(${gcol})`;ctx.font='800 11.5px "Pretendard Variable",Pretendard,sans-serif';ctx.fillText(kl,g.cx,g.cy+g.hub*.46);
+  raf=requestAnimationFrame(frame);}
+/* 패널 */
+const $=id=>document.getElementById(id);
+function openAsset(a){selected=a.id;selGroup=null;
+  const f=cur[a.id],pos=f>=0,col=pos?"var(--on)":"var(--off)",gc=a.group==="risk"?"47,230,168":"242,210,122";
+  const tag=$("ptag");tag.textContent=a.group==="risk"?"위험자산":"안전자산";tag.style.color=`rgb(${gc})`;tag.style.background=`rgba(${gc},.13)`;
+  $("pname").textContent=a.name;
+  $("pnow").innerHTML=`이 기간 자금 흐름 <span style="color:${col}">${fmt(f)}</span> · ${pos?"유입":"유출"}`;
+  $("pk1").textContent="왜 중요한가";$("pk2").textContent="어떻게 보나";
+  $("pwhy").textContent=DETAIL[a.id].w;$("pread").textContent=DETAIL[a.id].r;
+  $("pmembers").style.display="none";
+  $("panel").classList.add("open");}
+function openGroup(key){selGroup=key;selected=null;
+  const G=GROUP_INFO[key],mem=ASSETS.filter(a=>a.group===key),avg=mem.reduce((s,a)=>s+cur[a.id],0)/mem.length,pos=avg>=0;
+  const tag=$("ptag");tag.textContent="그룹";tag.style.color=`rgb(${G.color})`;tag.style.background=`rgba(${G.color},.13)`;
+  $("pname").textContent=G.name;
+  $("pnow").innerHTML=`그룹 평균 <span style="color:${pos?'var(--on)':'var(--off)'}">${fmt(avg)}</span> · ${pos?"유입":"유출"}`;
+  $("pk1").textContent="어떤 자산인가";$("pk2").textContent="어떻게 보나";
+  $("pwhy").textContent=G.w;$("pread").textContent=G.r;
+  const ml=$("mlist");ml.innerHTML="";
+  mem.sort((a,b)=>cur[b.id]-cur[a.id]).forEach(a=>{const f=cur[a.id],p=f>=0,row=document.createElement("div");row.className="mrow";
+    row.innerHTML=`<span class="mn">${a.name}</span><span class="mv" style="color:${p?'var(--on)':'var(--off)'}">${fmt(f)}</span>`;
+    row.addEventListener("click",()=>openAsset(a));ml.appendChild(row);});
+  $("pmembers").style.display="";
+  $("panel").classList.add("open");}
+function closePanel(){selected=null;selGroup=null;$("panel").classList.remove("open");}
+$("px").addEventListener("click",closePanel);
+$("axSafe").addEventListener("click",()=>openGroup("safe"));
+$("axRisk").addEventListener("click",()=>openGroup("risk"));
+cv.addEventListener("click",e=>{const r=cv.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+  const g=geom();
+  if(Math.hypot(g.cx-mx,g.cy-my)<g.hub*1.2){ // 중앙 허브 → 현재 우세 그룹 설명
+    openGroup(scoreOf()>=0?"risk":"safe");return;}
+  let best=null,bd=1e9;for(const a of ASSETS){const p=nodePos(a),d=Math.hypot(p.x-mx,p.y-my);if(d<bd){bd=d;best=a;}}
+  if(best&&bd<34)openAsset(best);else closePanel();});
+function refresh(){verdict();buildRank();
+  if(selected){const a=ASSETS.find(x=>x.id===selected);if(a)openAsset(a);}
+  else if(selGroup)openGroup(selGroup);}
+$("seg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;period=b.dataset.k;
+  document.querySelectorAll("#seg button").forEach(x=>x.setAttribute("aria-pressed",x===b));
+  refresh();loadFlow(period).then(refresh);});
+ASSETS.forEach(a=>cur[a.id]=DATA[period][a.id]);resize();refresh();
+loadFlow(period).then(refresh);
+setInterval(()=>loadFlow(period).then(refresh),60e3);
+if(reduce){tPrev=performance.now();frame(performance.now());cancelAnimationFrame(raf);}else{raf=requestAnimationFrame(frame);}
+setInterval(refresh,700);
+</script>
+</body>
+</html>
